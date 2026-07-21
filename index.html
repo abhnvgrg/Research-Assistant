@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research Assistant</title>
+<style>
+  :root {
+    --ink: #0b0e14;
+    --ink-raised: #12161f;
+    --ink-border: #232938;
+    --paper: #e8e6e1;
+    --paper-dim: #9a9689;
+    --gold: #d4a24e;
+    --gold-dim: #8a6a34;
+    --teal: #5fb3a3;
+    --red: #c96a5a;
+    --mono: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+    --serif: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--ink-border);
+  }
+  header h1 {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    margin: 0;
+    color: var(--paper);
+  }
+  header h1 span { color: var(--gold); }
+  .token-row { display: flex; align-items: center; gap: 8px; }
+  .token-row input {
+    background: var(--ink-raised);
+    border: 1px solid var(--ink-border);
+    color: var(--paper-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 3px;
+    width: 240px;
+  }
+  .token-row input:focus { outline: 1px solid var(--gold-dim); color: var(--paper); }
+  .token-label { font-size: 11px; color: var(--paper-dim); text-transform: lowercase; }
+
+  main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 1px;
+    background: var(--ink-border);
+    min-height: calc(100vh - 60px);
+  }
+  section { background: var(--ink); padding: 24px 28px; }
+
+  .field-label {
+    font-size: 11px;
+    color: var(--paper-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  textarea {
+    width: 100%;
+    background: var(--ink-raised);
+    border: 1px solid var(--ink-border);
+    color: var(--paper);
+    font-family: var(--serif);
+    font-size: 15px;
+    padding: 12px;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 80px;
+  }
+  textarea:focus { outline: 1px solid var(--gold-dim); }
+
+  button {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    padding: 9px 18px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  button:hover:not(:disabled) { background: var(--gold); color: var(--ink); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .run-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+  .trace { margin-top: 32px; }
+  .trace-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 12.5px;
+    color: var(--paper-dim);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ink-border);
+    flex-shrink: 0;
+  }
+  .trace-item.done .dot { background: var(--teal); }
+  .trace-item.done { color: var(--paper); }
+  .trace-item.error .dot { background: var(--red); }
+  .trace-item.error { color: var(--red); }
+  .trace-item .node-name { flex: 1; }
+  .trace-item .node-summary { font-size: 11px; color: var(--paper-dim); }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .trace-item.running .dot { background: var(--gold); animation: pulse 1s infinite; }
+  .trace-item.running { color: var(--gold); }
+
+  .answer-empty {
+    color: var(--paper-dim);
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 15px;
+    padding-top: 40px;
+    text-align: center;
+  }
+  .answer {
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    color: var(--paper);
+  }
+  .citations {
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid var(--ink-border);
+  }
+  .citations .field-label { margin-bottom: 10px; }
+  .citation {
+    font-size: 12.5px;
+    padding: 5px 0;
+    color: var(--teal);
+    word-break: break-all;
+  }
+  .citation b { color: var(--paper-dim); font-weight: 400; margin-right: 6px; }
+
+  .status-line {
+    font-size: 11px;
+    color: var(--paper-dim);
+    margin-top: 6px;
+    min-height: 14px;
+  }
+  .status-line.error { color: var(--red); }
+
+  .ingest-panel {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--ink-border);
+  }
+  .ingest-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .ingest-tabs button {
+    font-size: 11px; padding: 5px 12px;
+    border-color: var(--ink-border); color: var(--paper-dim);
+  }
+  .ingest-tabs button.active { border-color: var(--gold-dim); color: var(--gold); }
+  .ingest-tabs button:hover { background: transparent; color: var(--paper); }
+  .ingest-tabs button.active:hover { color: var(--gold); }
+  .ingest-input { width: 100%; }
+  input[type="text"].ingest-input, input[type="file"].ingest-input {
+    background: var(--ink-raised);
+    border: 1px solid var(--ink-border);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 8px 10px;
+    border-radius: 3px;
+    width: 100%;
+  }
+  textarea.ingest-input { min-height: 60px; font-family: var(--mono); font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>research<span>·</span>assistant</h1>
+  <div class="token-row">
+    <span class="token-label">bearer token</span>
+    <input id="token" type="password" placeholder="paste a signed JWT" autocomplete="off">
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="field-label">Query</div>
+    <textarea id="query" placeholder="e.g. explain how attention mechanisms work in transformers"></textarea>
+    <div class="run-row">
+      <button id="runBtn">Run research →</button>
+    </div>
+    <div id="queryStatus" class="status-line"></div>
+
+    <div class="trace" id="trace"></div>
+
+    <div class="ingest-panel">
+      <div class="field-label">Ingest a document</div>
+      <div class="ingest-tabs">
+        <button class="active" data-mode="text">text</button>
+        <button data-mode="url">url</button>
+        <button data-mode="file">pdf</button>
+      </div>
+      <div id="ingestInputWrap">
+        <textarea class="ingest-input" id="ingestText" placeholder="paste text to ingest…"></textarea>
+      </div>
+      <div class="run-row">
+        <button id="ingestBtn">Ingest →</button>
+      </div>
+      <div id="ingestStatus" class="status-line"></div>
+    </div>
+  </section>
+
+  <section>
+    <div id="answerWrap">
+      <div class="answer-empty">Run a query to see the answer stream in here.</div>
+    </div>
+  </section>
+</main>
+
+<script>
+const API_BASE = window.location.origin.includes('null') || window.location.protocol === 'file:'
+  ? 'http://127.0.0.1:8000'
+  : window.location.origin;
+
+const NODE_ORDER = ['quota_check','decomposer','router','vector_retriever','web_search','grader','synthesizer','reflection','formatter'];
+
+function authHeaders(extra = {}) {
+  const token = document.getElementById('token').value.trim();
+  return token ? { 'Authorization': 'Bearer ' + token, ...extra } : extra;
+}
+
+function ensureToken(statusEl) {
+  const token = document.getElementById('token').value.trim();
+  if (token) return true;
+  statusEl.textContent = 'Paste a valid signed JWT in the bearer token field first.';
+  statusEl.className = 'status-line error';
+  return false;
+}
+
+function renderTrace(nodeState) {
+  const el = document.getElementById('trace');
+  el.innerHTML = NODE_ORDER
+    .filter(n => nodeState[n])
+    .map(n => {
+      const s = nodeState[n];
+      const cls = s.status === 'done' ? 'done' : s.status === 'error' ? 'error' : 'running';
+      const summary = s.summary ? `<span class="node-summary">${s.summary}</span>` : '';
+      return `<div class="trace-item ${cls}"><div class="dot"></div><span class="node-name">${n}</span>${summary}</div>`;
+    }).join('');
+}
+
+function summarizeNode(node, summary) {
+  if (!summary) return '';
+  if (node === 'decomposer' && summary.sub_questions) return summary.sub_questions + ' sub-questions';
+  if (node === 'grader' && summary.kept !== undefined) return summary.kept + ' chunks kept';
+  if (node === 'router' && summary.route) return summary.route;
+  if (node === 'reflection' && summary.pass_ !== undefined) return summary.pass_ ? 'passed' : 'looping back';
+  return '';
+}
+
+async function runQuery() {
+  const query = document.getElementById('query').value.trim();
+  const statusEl = document.getElementById('queryStatus');
+  const runBtn = document.getElementById('runBtn');
+  const answerWrap = document.getElementById('answerWrap');
+
+  if (query.length < 10) {
+    statusEl.textContent = 'Query must be at least 10 characters.';
+    statusEl.className = 'status-line error';
+    return;
+  }
+  if (!ensureToken(statusEl)) return;
+
+  runBtn.disabled = true;
+  statusEl.className = 'status-line';
+  statusEl.textContent = 'Starting run…';
+  answerWrap.innerHTML = '<div class="answer-empty">Waiting for the agent to start…</div>';
+
+  let runId;
+  try {
+    const startResp = await fetch(`${API_BASE}/research/query`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ query })
+    });
+    if (!startResp.ok) {
+      const err = await startResp.json().catch(() => ({}));
+      if (startResp.status === 401) {
+        throw new Error('Unauthorized. Paste a valid signed JWT in the bearer token field.');
+      }
+      throw new Error(err.detail || `HTTP ${startResp.status}`);
+    }
+    const data = await startResp.json();
+    runId = data.run_id;
+    statusEl.textContent = `run_id: ${runId}`;
+  } catch (e) {
+    statusEl.textContent = 'Failed to start: ' + e.message;
+    statusEl.className = 'status-line error';
+    runBtn.disabled = false;
+    return;
+  }
+
+  const nodeState = {};
+  document.getElementById('trace').innerHTML = '';
+
+  try {
+    const streamResp = await fetch(`${API_BASE}/research/${runId}/stream`, {
+      headers: authHeaders()
+    });
+    if (!streamResp.ok || !streamResp.body) {
+      if (streamResp.status === 401) {
+        throw new Error('Unauthorized. Paste a valid signed JWT in the bearer token field.');
+      }
+      throw new Error(`stream HTTP ${streamResp.status}`);
+    }
+
+    const reader = streamResp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const event = JSON.parse(line.slice(6));
+
+        if (event.type === 'node_complete') {
+          nodeState[event.node] = { status: 'done', summary: summarizeNode(event.node, event.summary) };
+          renderTrace(nodeState);
+        } else if (event.type === 'citation_map') {
+          window.__lastCitations = event.citations;
+        } else if (event.type === 'run_complete') {
+          renderAnswer(event.answer, window.__lastCitations || {});
+          statusEl.textContent = `complete — ${event.cycle_count} reflection cycle(s)`;
+        } else if (event.type === 'error') {
+          statusEl.textContent = 'Error: ' + event.message;
+          statusEl.className = 'status-line error';
+          answerWrap.innerHTML = `<div class="answer-empty">${event.message}</div>`;
+        }
+      }
+    }
+  } catch (e) {
+    statusEl.textContent = 'Stream error: ' + e.message;
+    statusEl.className = 'status-line error';
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+function renderAnswer(answer, citations) {
+  const wrap = document.getElementById('answerWrap');
+  const citationEntries = Object.entries(citations || {});
+  wrap.innerHTML = `
+    <div class="answer">${escapeHtml(answer)}</div>
+    ${citationEntries.length ? `
+      <div class="citations">
+        <div class="field-label">Sources</div>
+        ${citationEntries.map(([n, url]) => `<div class="citation"><b>[${n}]</b>${escapeHtml(url)}</div>`).join('')}
+      </div>` : ''}
+  `;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+// ---- ingest panel ----
+let ingestMode = 'text';
+document.querySelectorAll('.ingest-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ingest-tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ingestMode = btn.dataset.mode;
+    const wrap = document.getElementById('ingestInputWrap');
+    if (ingestMode === 'text') {
+      wrap.innerHTML = '<textarea class="ingest-input" id="ingestText" placeholder="paste text to ingest…"></textarea>';
+    } else if (ingestMode === 'url') {
+      wrap.innerHTML = '<input class="ingest-input" id="ingestUrl" type="text" placeholder="https://example.com/article">';
+    } else {
+      wrap.innerHTML = '<input class="ingest-input" id="ingestFile" type="file" accept="application/pdf">';
+    }
+  });
+});
+
+async function runIngest() {
+  const statusEl = document.getElementById('ingestStatus');
+  const btn = document.getElementById('ingestBtn');
+  const form = new FormData();
+  if (!ensureToken(statusEl)) return;
+
+  if (ingestMode === 'text') {
+    const v = document.getElementById('ingestText').value.trim();
+    if (!v) { statusEl.textContent = 'Enter some text first.'; statusEl.className = 'status-line error'; return; }
+    form.append('text', v);
+  } else if (ingestMode === 'url') {
+    const v = document.getElementById('ingestUrl').value.trim();
+    if (!v) { statusEl.textContent = 'Enter a URL first.'; statusEl.className = 'status-line error'; return; }
+    form.append('url', v);
+  } else {
+    const f = document.getElementById('ingestFile').files[0];
+    if (!f) { statusEl.textContent = 'Choose a PDF first.'; statusEl.className = 'status-line error'; return; }
+    form.append('file', f);
+  }
+
+  btn.disabled = true;
+  statusEl.className = 'status-line';
+  statusEl.textContent = 'Uploading…';
+
+  try {
+    const startResp = await fetch(`${API_BASE}/ingest/document`, {
+      method: 'POST', headers: authHeaders(), body: form
+    });
+    if (!startResp.ok) {
+      const err = await startResp.json().catch(() => ({}));
+      if (startResp.status === 401) {
+        throw new Error('Unauthorized. Paste a valid signed JWT in the bearer token field.');
+      }
+      throw new Error(err.detail || `HTTP ${startResp.status}`);
+    }
+    const { job_id } = await startResp.json();
+    statusEl.textContent = `job ${job_id} — processing…`;
+
+    // poll every 800ms until complete/failed
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => setTimeout(r, 800));
+      const statusResp = await fetch(`${API_BASE}/ingest/${job_id}/status`, { headers: authHeaders() });
+      const s = await statusResp.json();
+      if (s.status === 'complete') {
+        statusEl.textContent = `done — "${s.title}" — ${s.chunks_ingested} chunks ingested (${s.chunks_dropped} dropped)`;
+        break;
+      } else if (s.status === 'failed') {
+        statusEl.textContent = 'Failed: ' + s.error;
+        statusEl.className = 'status-line error';
+        break;
+      }
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.className = 'status-line error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('runBtn').addEventListener('click', runQuery);
+document.getElementById('ingestBtn').addEventListener('click', runIngest);
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.metaKey) runQuery();
+});
+</script>
+
+</body>
+</html>
