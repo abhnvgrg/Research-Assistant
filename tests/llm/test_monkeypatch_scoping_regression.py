@@ -47,10 +47,15 @@ async def test_patching_client_module_alone_does_not_affect_embeddings(monkeypat
 
     # embeddings_module.get_client is still the REAL function here,
     # which would try to construct a real AsyncOpenAI client and
-    # fail without OPENAI_API_KEY set. We catch that to prove the
-    # patch on client_module alone had no effect.
+    # fail without OPENAI_API_KEY set. The key is removed explicitly
+    # rather than assumed absent, so the proof holds in CI too --
+    # with a key present this would make a real network call instead.
     import pytest
     from openai import OpenAIError
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    embeddings_module._client = None
+    client_module._client = None
 
     with pytest.raises(OpenAIError, match="Missing credentials"):
         await embed_text("some text")

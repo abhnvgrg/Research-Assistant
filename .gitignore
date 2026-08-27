@@ -28,3 +28,6 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Personal engineering notes, not part of the repository
+docs/

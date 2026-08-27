@@ -39,7 +39,7 @@ import app.store as store_module
 from app.ingest_store import JobStore
 
 TEST_JWT_SECRET = "test-only-secret-never-used-for-anything-real"
-os.environ.setdefault("SUPABASE_JWT_SECRET", TEST_JWT_SECRET)
+os.environ["SUPABASE_JWT_SECRET"] = TEST_JWT_SECRET
 
 
 def make_bearer_header(user_id: str, *, expired: bool = False) -> dict[str, str]:
