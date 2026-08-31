@@ -1,14 +1,3 @@
-"""
-Request/response schemas.
-
-QueryRequest's length bounds are the direct implementation of edge
-cases 4.1/4.2 from the input-edge-case design session: empty/trivial
-queries rejected client-side AND server-side (min_length=10), and a
-pasted-essay query redirected away from the query field rather than
-silently truncated (max_length=1000 — "redirect to /ingest/document
-for long content" per that design).
-"""
-
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

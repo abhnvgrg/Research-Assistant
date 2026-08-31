@@ -1,14 +1,3 @@
-"""
-synthesizer_node tests.
-
-The single most important test in this entire suite is
-test_synthesizer_never_calls_llm_with_empty_graded — this is the
-guard against edge case 3.3, the most dangerous silent failure we
-identified: calling the synthesizer with zero retrieved evidence
-produces a confident, uncited, fully hallucinated answer that is
-visually indistinguishable from a real one.
-"""
-
 from __future__ import annotations
 
 import app.graph.nodes as nodes
@@ -17,11 +6,6 @@ from tests.conftest import make_chunk
 
 
 async def test_synthesizer_never_calls_llm_with_empty_graded(decomposed_state, monkeypatch):
-    """If state['graded'] is empty, synthesizer_node must return a
-    graceful 'insufficient sources' message WITHOUT ever invoking
-    the LLM. We assert this by making the mocked LLM call itself
-    raise — if it's ever called, the test fails immediately."""
-
     decomposed_state["graded"] = []
 
     async def llm_must_not_be_called(query, graded):
@@ -36,7 +20,7 @@ async def test_synthesizer_never_calls_llm_with_empty_graded(decomposed_state, m
 
     assert result["citations"] == {}
     assert "insufficient sources" in result["answer"].lower() or "wasn't able" in result["answer"].lower()
-    assert result["tokens_used"] == 0  # no LLM call made — nothing to charge for
+    assert result["tokens_used"] == 0
 
 
 async def test_synthesizer_with_graded_chunks_calls_llm_and_returns_citations(
@@ -78,5 +62,5 @@ async def test_synthesizer_catches_llm_exception(decomposed_state, monkeypatch):
     result = await synthesizer_node(decomposed_state)
 
     assert "synthesis_failed" in result["error"]
-    assert "answer" not in result  # node must not fabricate a partial answer on failure
+    assert "answer" not in result
     assert result["tokens_used"] == 0

@@ -1,20 +1,3 @@
-"""
-API routes — implements the endpoint surface from the API design
-session: POST /research/query returns a run_id immediately (per the
-"streaming endpoint is critical for UX" design — the client opens
-the SSE connection right after, without waiting for any work to
-happen synchronously), GET /research/{run_id}/stream is the SSE
-endpoint, GET /research/{run_id}/result is the polling fallback /
-post-completion fetch.
-
-Every route that touches a specific run_id checks run_store.owns()
-first — this is the in-memory equivalent of Supabase RLS
-(`user_id = auth.uid()`), the same defense-in-depth principle from
-the auth design: even if something upstream got the user_id wrong,
-this check independently blocks cross-user access to another user's
-run (edge case: IDOR / insecure direct object reference).
-"""
-
 from __future__ import annotations
 
 import uuid
@@ -75,9 +58,6 @@ async def start_research(
         "tokens_used": 0,
     }
 
-    # BackgroundTasks fires AFTER the response is sent — the client
-    # gets run_id immediately and can open the SSE connection right
-    # away, matching the "streaming is critical for UX" design.
     background_tasks.add_task(run_graph_and_publish, run_id, initial_state)
 
     return QueryResponse(run_id=run_id, status=RunStatus.RUNNING.value)
@@ -96,8 +76,6 @@ async def stream_research(
         event_stream_for_run(run_id, request),
         media_type="text/event-stream",
         headers={
-            # Prevents intermediary buffering (e.g. some proxy
-            # configs) from delaying delivery of SSE chunks.
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
         },
@@ -135,14 +113,6 @@ async def start_ingest(
     url: str | None = Form(None),
     text: str | None = Form(None),
 ) -> IngestResponse:
-    """Accepts exactly one of: a PDF file upload, a `url` form field,
-    or a `text` form field — matching the three source_type values
-    ingest_source() supports. Returns a job_id immediately (per the
-    original ingestion design: "user gets a job ID, polls
-    /ingest/{job_id}/status") and does the actual parsing/embedding/
-    upsert work in the background, since a 20-page PDF can take
-    several seconds — far too slow to hold the request open for.
-    """
     provided = [v for v in (file, url, text) if v is not None]
     if len(provided) != 1:
         raise HTTPException(
@@ -151,12 +121,6 @@ async def start_ingest(
         )
 
     if file is not None:
-        # Fail fast on grossly oversized uploads before even reading
-        # the body into memory — the definitive size check still
-        # happens inside load_pdf() too (defense in depth), but this
-        # avoids buffering a huge upload just to reject it a moment
-        # later. file.size may be None for some transfer encodings,
-        # in which case we fall through to the check inside load_pdf.
         if file.size is not None and file.size > MAX_PDF_SIZE_BYTES:
             raise HTTPException(
                 status_code=413,

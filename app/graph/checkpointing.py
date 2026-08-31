@@ -24,10 +24,6 @@ def _checkpoint_db_path() -> str:
 
 
 async def init_checkpointer() -> None:
-    """Best-effort initialization.
-
-    On any failure, keep serving requests using the non-checkpointed graph.
-    """
     global _checkpointer, _checkpointer_cm, _checkpointed_graph
 
     if _checkpointer is not None:

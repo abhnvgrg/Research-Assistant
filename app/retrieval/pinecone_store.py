@@ -1,14 +1,3 @@
-"""
-Pinecone implementation of VectorStore. This is the ONLY file in the
-codebase that imports the pinecone SDK — every node and every other
-piece of retrieval logic goes through the VectorStore interface in
-base.py instead.
-
-Uses AsyncPinecone + AsyncIndex (the real async client, not the
-sync Pinecone() wrapped in a thread pool) so retrieval never blocks
-the FastAPI event loop.
-"""
-
 from __future__ import annotations
 
 import os
@@ -26,9 +15,6 @@ class PineconeVectorStore(VectorStore):
         self._index = None
 
     async def _get_index(self):
-        """Lazily constructed — mirrors the OpenAI client pattern in
-        app.llm.client so importing this module never requires
-        PINECONE_API_KEY to be set (keeps tests import-safe)."""
         if self._index is None:
             self._client = AsyncPinecone(api_key=self._api_key)
             self._index = self._client.IndexAsyncio(host=self._index_host)

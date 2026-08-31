@@ -1,27 +1,3 @@
-"""
-Ingestion orchestrator — the offline pipeline from the ingestion
-design session:
-
-    source -> loader -> chunker -> metadata tagger -> embedder -> upsert
-
-Design decisions this file encodes:
-  - Idempotent upsert: each chunk's Pinecone vector ID is
-    sha256(source_identifier + chunk_index), so re-ingesting the same
-    document overwrites its own vectors instead of duplicating them.
-  - embed_model is stamped into every chunk's metadata — this is what
-    lets the cache-key design and the "embedding model drift" silent
-    failure (S1) both detect a model change after the fact.
-  - Chunks are embedded in batches (OpenAI's embeddings.create
-    already accepts a list) rather than one API call per chunk —
-    same principle as the grader's asyncio.gather, but here it's a
-    single batched call, since OpenAI's embeddings endpoint natively
-    supports up to ~2048 inputs per request.
-  - Returns a structured result (chunks_ingested, chunks_dropped,
-    document_id) rather than raising on partial success — a document
-    that yields zero usable chunks after the orphan-chunk filter is a
-    real, expected outcome (e.g. a title-page-only PDF), not a crash.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -34,7 +10,7 @@ from app.retrieval.base import VectorStore
 
 logger = logging.getLogger(__name__)
 
-EMBED_MODEL_NAME = "text-embedding-3-small"  # must match app.llm.embeddings.EMBEDDING_MODEL
+EMBED_MODEL_NAME = "text-embedding-3-small"
 
 
 class IngestionResult:
@@ -61,9 +37,6 @@ class IngestionResult:
 
 
 def _chunk_vector_id(source: str, chunk_index: int) -> str:
-    """Deterministic ID -> re-ingesting the same source overwrites
-    its own old vectors instead of creating duplicates alongside
-    them. This is the idempotency guarantee from the ingest design."""
     raw = f"{source}::{chunk_index}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -76,12 +49,6 @@ async def ingest_source(
     vector_store: VectorStore,
     filename: str | None = None,
 ) -> IngestionResult:
-    """Runs the full ingestion pipeline for one document and upserts
-    it into `user_id`'s Pinecone namespace.
-
-    source_type: "pdf" | "url" | "text"
-    source: PDF bytes, a URL string, or raw text, matching source_type
-    """
     loaded = await _load(source_type, source, filename=filename)
     text, title = loaded["text"], loaded["title"]
 

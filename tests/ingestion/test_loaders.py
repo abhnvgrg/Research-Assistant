@@ -1,16 +1,3 @@
-"""
-Loader tests — covers the three source types (PDF, URL, text) and
-every edge case the loaders design session called out explicitly:
-  - oversized PDF rejected before parsing (DoS guard, edge case 6.6)
-  - password-protected PDF rejected with a clear error, not a crash
-  - a single malformed page doesn't kill extraction of the rest
-  - URL fetches never touch the real network — mocked via
-    httpx.MockTransport, consistent with the "unit tests never hit
-    external services" rule
-  - HTML boilerplate (script/style/nav/footer) is stripped, not just
-    the visible tags
-"""
-
 from __future__ import annotations
 
 import io
@@ -24,18 +11,10 @@ from app.ingestion.loaders import LoaderError, load_pdf, load_text, load_url
 
 
 def _make_pdf_bytes(lines: list[str]) -> bytes:
-    """Builds a real, single-page, parseable PDF with the given lines
-    of text — using reportlab to generate genuine PDF structure
-    rather than a hand-rolled fixture, so pypdf's real extraction
-    code path runs."""
     return _make_multipage_pdf_bytes([lines])
 
 
 def _make_multipage_pdf_bytes(pages: list[list[str]]) -> bytes:
-    """Like _make_pdf_bytes, but each inner list becomes its own
-    genuine PDF page (calls canvas.showPage() between pages) —
-    needed for tests that must exercise pypdf's per-page extraction
-    loop across more than one real page."""
     buf = io.BytesIO()
     c = canvas.Canvas(buf)
     for page_lines in pages:
@@ -62,8 +41,6 @@ def _make_encrypted_pdf_bytes(password: str = "secret") -> bytes:
     return out.getvalue()
 
 
-# ---- load_pdf ----
-
 def test_load_pdf_extracts_text_and_guesses_title():
     pdf_bytes = _make_pdf_bytes(["Attention Is All You Need", "We propose the Transformer."])
     result = load_pdf(pdf_bytes, filename="paper.pdf")
@@ -74,18 +51,13 @@ def test_load_pdf_extracts_text_and_guesses_title():
 
 
 def test_load_pdf_falls_back_to_filename_when_title_guess_fails():
-    """A first line that's implausible as a title (too short, e.g.
-    just a page number) should fall back to the filename."""
-    pdf_bytes = _make_pdf_bytes(["1"])  # 1 char, below the 3-char minimum
+    pdf_bytes = _make_pdf_bytes(["1"])
     result = load_pdf(pdf_bytes, filename="report.pdf")
     assert result["title"] == "report.pdf"
 
 
 def test_load_pdf_rejects_oversized_files_without_parsing():
-    """Edge case: DoS guard. An oversized 'PDF' (garbage bytes are
-    fine here — the size check must happen BEFORE any parsing is
-    attempted, so this must reject without ever touching PdfReader)."""
-    oversized = b"x" * (21 * 1024 * 1024)  # 21MB, over the 20MB limit
+    oversized = b"x" * (21 * 1024 * 1024)
 
     with pytest.raises(LoaderError, match="exceeds"):
         load_pdf(oversized, filename="huge.pdf")
@@ -104,8 +76,6 @@ def test_load_pdf_rejects_corrupt_bytes():
 
 
 def test_load_pdf_survives_a_single_malformed_page(monkeypatch):
-    """A page that throws during extract_text() must not take down
-    extraction of the other pages in the same document."""
     pdf_bytes = _make_multipage_pdf_bytes([["Good page one"], ["Good page two"]])
 
     import pypdf
@@ -126,20 +96,16 @@ def test_load_pdf_survives_a_single_malformed_page(monkeypatch):
 
 
 def test_load_pdf_rejects_pdf_with_no_extractable_text():
-    """Simulates a scanned-image PDF with no OCR — pypdf successfully
-    opens it but extracts nothing."""
     from pypdf import PdfWriter
 
     writer = PdfWriter()
-    writer.add_blank_page(width=200, height=200)  # no text content at all
+    writer.add_blank_page(width=200, height=200)
     buf = io.BytesIO()
     writer.write(buf)
 
     with pytest.raises(LoaderError, match="No extractable text"):
         load_pdf(buf.getvalue(), filename="scanned.pdf")
 
-
-# ---- load_url ----
 
 def _patch_http_response(monkeypatch, *, status_code: int = 200, text: str = "", raise_error: bool = False):
     async def handler(request):
@@ -166,7 +132,7 @@ async def test_load_url_extracts_text_and_title(monkeypatch):
 
     assert result["title"] == "Understanding Attention"
     assert "Attention lets models focus." in result["text"]
-    assert "var x = 1" not in result["text"]  # script content stripped
+    assert "var x = 1" not in result["text"]
 
 
 async def test_load_url_strips_nav_and_footer_boilerplate(monkeypatch):
@@ -214,8 +180,6 @@ async def test_load_url_rejects_empty_extracted_text(monkeypatch):
     with pytest.raises(LoaderError, match="No readable text"):
         await load_url("https://example.com/empty")
 
-
-# ---- load_text ----
 
 def test_load_text_returns_input_unchanged():
     result = load_text("Some pasted research notes.", title="My Notes")

@@ -1,9 +1,3 @@
-"""
-Tests for _extract_and_validate_citations — the post-generation
-guard against edge case 4.1 (citation hallucination): the LLM cites
-[N] for an N that doesn't correspond to any real graded chunk.
-"""
-
 from __future__ import annotations
 
 from app.graph.nodes import _extract_and_validate_citations
@@ -23,7 +17,7 @@ def test_valid_citations_are_preserved():
 
     cleaned, citations = _extract_and_validate_citations(answer, graded)
 
-    assert cleaned == answer  # nothing stripped
+    assert cleaned == answer
     assert citations == {
         "1": "https://source-0.com",
         "2": "https://source-1.com",
@@ -32,9 +26,6 @@ def test_valid_citations_are_preserved():
 
 
 def test_hallucinated_citation_index_is_stripped():
-    """The core edge-case-4.1 test: only 3 chunks exist, but the
-    LLM cites [4]. [4] must be removed from the answer text and
-    must never appear in the citations map."""
     graded = _graded(3)
     answer = "Fact A is well established [1][2][4]."
 
@@ -46,9 +37,6 @@ def test_hallucinated_citation_index_is_stripped():
 
 
 def test_citation_map_only_includes_indices_actually_cited():
-    """If graded has 5 chunks but the answer only cites [1] and
-    [3], the citation map should not include 2, 4, 5 — no point
-    showing sources the answer never referenced."""
     graded = _graded(5)
     answer = "Point one [1]. Point two [3]."
 
@@ -68,9 +56,6 @@ def test_no_citations_in_answer_returns_empty_map():
 
 
 def test_empty_graded_list_strips_all_citations():
-    """Defensive: if somehow called with graded=[] (shouldn't happen
-    since synthesizer_node guards this earlier), every [N] is
-    invalid by definition and must be stripped."""
     answer = "This claims something [1]."
 
     cleaned, citations = _extract_and_validate_citations(answer, [])

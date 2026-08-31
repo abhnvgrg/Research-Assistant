@@ -1,11 +1,3 @@
-"""
-System prompts — one constant per node, matching the prompt designs
-from earlier in this project's design phase. Kept as plain module-
-level strings (not f-strings) so they're eligible for OpenAI's
-automatic prompt caching, which requires the system prompt to be
-byte-identical across calls.
-"""
-
 DECOMPOSER_SYSTEM_PROMPT = """\
 You are a research query analyst for a retrieval-augmented research assistant.
 Your job is to decompose a user query into 2-5 focused sub-questions that, \

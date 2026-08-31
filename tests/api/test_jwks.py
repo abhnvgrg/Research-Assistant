@@ -1,12 +1,3 @@
-"""
-Tests for app.api.jwks — the JWKS fetching and caching logic itself,
-isolated from deps.py. test_deps.py's asymmetric-path tests
-monkeypatch deps.get_jwks() directly, which proves deps.py calls it
-correctly but never exercises get_jwks()'s own fetch/cache/refresh
-logic — these tests close that gap using httpx.MockTransport, the
-same never-touch-the-real-network pattern used in test_loaders.py.
-"""
-
 from __future__ import annotations
 
 import time
@@ -20,9 +11,6 @@ from app.api.jwks import AuthConfigError, find_key, get_jwks
 
 @pytest.fixture(autouse=True)
 def reset_jwks_cache(monkeypatch):
-    """jwks.py's cache is module-level global state — reset it
-    before every test so one test's fetch can't leak into another's
-    assertions about whether a fetch happened."""
     monkeypatch.setattr(jwks_module, "_jwks_cache", None)
     monkeypatch.setattr(jwks_module, "_jwks_cache_fetched_at", 0.0)
 
@@ -83,7 +71,7 @@ async def test_get_jwks_uses_cache_on_second_call_within_ttl(monkeypatch):
     _patch_jwks_response(monkeypatch, keys=[{"kid": "key-1"}], call_counter=call_counter)
 
     await get_jwks()
-    await get_jwks()  # should hit cache, not fetch again
+    await get_jwks()
 
     assert len(call_counter) == 1
 
@@ -95,8 +83,6 @@ async def test_get_jwks_refetches_after_cache_expires(monkeypatch):
 
     await get_jwks()
 
-    # Simulate time passing beyond the cache TTL by rewinding the
-    # recorded fetch timestamp, rather than actually sleeping in a test.
     monkeypatch.setattr(
         jwks_module, "_jwks_cache_fetched_at", time.monotonic() - jwks_module.JWKS_CACHE_TTL_SECONDS - 1
     )
@@ -107,10 +93,6 @@ async def test_get_jwks_refetches_after_cache_expires(monkeypatch):
 
 
 async def test_get_jwks_force_refresh_bypasses_a_fresh_cache(monkeypatch):
-    """The exact scenario this exists for: a token's kid isn't found
-    in the cached set right after Supabase rotates its signing key —
-    force_refresh must bypass even a cache that's still within its
-    normal TTL."""
     monkeypatch.setenv("SUPABASE_URL", "https://project.supabase.co")
     call_counter: list[int] = []
     _patch_jwks_response(monkeypatch, keys=[{"kid": "key-1"}], call_counter=call_counter)
@@ -136,8 +118,6 @@ async def test_get_jwks_raises_on_http_error(monkeypatch):
     with pytest.raises(httpx.HTTPStatusError):
         await get_jwks()
 
-
-# ---- find_key ----
 
 def test_find_key_returns_matching_key():
     jwks = {"keys": [{"kid": "a"}, {"kid": "b"}]}

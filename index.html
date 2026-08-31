@@ -392,7 +392,6 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
-// ---- ingest panel ----
 let ingestMode = 'text';
 document.querySelectorAll('.ingest-tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -448,7 +447,6 @@ async function runIngest() {
     const { job_id } = await startResp.json();
     statusEl.textContent = `job ${job_id} — processing…`;
 
-    // poll every 800ms until complete/failed
     for (let i = 0; i < 40; i++) {
       await new Promise(r => setTimeout(r, 800));
       const statusResp = await fetch(`${API_BASE}/ingest/${job_id}/status`, { headers: authHeaders() });

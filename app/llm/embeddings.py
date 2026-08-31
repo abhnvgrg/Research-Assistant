@@ -1,13 +1,3 @@
-"""
-Embedding client — wraps OpenAI's embeddings endpoint with the same
-retry policy as app.llm.client, since embedding calls hit the same
-rate limits and transient failure modes as chat completions.
-
-Kept separate from client.py because embeddings return vectors, not
-chat completions, and batching semantics differ (embed multiple
-texts in one call, vs one prompt per chat call).
-"""
-
 from __future__ import annotations
 
 from openai import APIError, APITimeoutError, RateLimitError
@@ -28,12 +18,6 @@ _RETRYABLE = (APITimeoutError, RateLimitError, APIError)
     reraise=True,
 )
 async def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Embeds a batch of texts in a single API call (up to 2048
-    inputs per OpenAI's limit — well above our per-query sub-question
-    count, so callers never need to chunk this themselves).
-
-    Returns one embedding vector per input text, in the same order.
-    """
     if not texts:
         return []
 
@@ -47,6 +31,5 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
 
 
 async def embed_text(text: str) -> list[float]:
-    """Single-text convenience wrapper around embed_texts."""
     vectors = await embed_texts([text])
     return vectors[0]

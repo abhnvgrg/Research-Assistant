@@ -1,18 +1,3 @@
-"""
-Unit tests for QuotaStore — isolated from the graph entirely.
-
-This is the store that makes quota_check_node meaningful: the old
-version of that node always returned quota_ok=True regardless of
-anything. These tests prove real usage is tracked and a user who
-exceeds their limit is genuinely blocked.
-
-All public methods are async — even though the in-memory
-implementation doesn't need to await anything internally, this
-matches SupabaseQuotaStore's genuinely I/O-bound interface exactly,
-so callers work identically against either backend (see the
-docstrings in app/quota_store.py for the full reasoning).
-"""
-
 from __future__ import annotations
 
 from app.quota_store import DEFAULT_QUOTA_LIMIT, QuotaStore
@@ -65,9 +50,6 @@ async def test_has_quota_returns_true_just_under_limit():
 
 
 async def test_usage_is_isolated_per_user():
-    """The core correctness guarantee — one user's usage must never
-    bleed into another's, mirroring the same isolation requirement
-    RunStore/JobStore have via owns()."""
     store = QuotaStore()
     await store.add_usage("user-a", 5000)
 
@@ -80,10 +62,6 @@ async def test_usage_is_isolated_per_user():
 
 
 async def test_add_usage_ignores_zero_or_negative_deltas():
-    """Defensive: a node that failed before making any real LLM call
-    reports tokens_used=0 — that must be a true no-op, not corrupt
-    the stored total in some edge case (e.g. via a bug that
-    subtracts)."""
     store = QuotaStore()
     await store.add_usage("user-a", 0)
     await store.add_usage("user-a", -100)
@@ -95,7 +73,7 @@ async def test_add_usage_ignores_zero_or_negative_deltas():
 async def test_set_limit_changes_quota_for_future_checks():
     store = QuotaStore()
     await store.add_usage("user-a", 500)
-    assert await store.has_quota("user-a") is True  # under default 200k limit
+    assert await store.has_quota("user-a") is True
 
-    await store.set_limit("user-a", 400)  # simulate a downgraded/reduced plan
+    await store.set_limit("user-a", 400)
     assert await store.has_quota("user-a") is False

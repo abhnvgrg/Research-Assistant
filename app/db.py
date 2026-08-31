@@ -11,11 +11,6 @@ _pool: asyncpg.Pool | None = None
 
 
 async def init_pool() -> None:
-    """Best-effort DB initialization.
-
-    If DATABASE_URL is missing or the connection fails, we keep the app
-    running and let callers transparently fall back to in-memory stores.
-    """
     global _pool
 
     database_url = os.environ.get("DATABASE_URL")

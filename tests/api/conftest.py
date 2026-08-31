@@ -1,28 +1,3 @@
-"""
-Shared fixtures for API-layer tests.
-
-`stub_all_graph_calls` patches every external `_call_*` function in
-app.graph.nodes at once — the API tests care about routing, auth,
-SSE framing, and the store, not about re-proving node-level behavior
-already covered exhaustively in tests/test_*_node.py. One shared
-happy-path stub keeps these tests focused on what they're actually
-testing.
-
-`fresh_run_store` resets the module-level RunStore singleton before
-each test so runs from one test can never leak into another — the
-store is process-global by design (mirroring a real deployment's
-single shared store), so tests must explicitly isolate themselves.
-
-`make_bearer_header()` mints a REAL, correctly-signed HS256 JWT for
-tests — now that app/api/deps.py performs genuine cryptographic
-verification (see the auth-hardening fix), an arbitrary string like
-"Bearer demo-token-abc" is correctly rejected as an invalid
-signature. SUPABASE_JWT_SECRET is set to a fixed test-only value at
-import time so every test in this package (and downstream imports of
-this helper from other test files) can mint tokens without needing
-per-test setup.
-"""
-
 from __future__ import annotations
 
 import os
@@ -43,9 +18,6 @@ os.environ["SUPABASE_JWT_SECRET"] = TEST_JWT_SECRET
 
 
 def make_bearer_header(user_id: str, *, expired: bool = False) -> dict[str, str]:
-    """Mints a real HS256 JWT with the same shape a genuine
-    Supabase-issued token has (sub, aud, exp) and returns it as an
-    Authorization header dict, ready to pass to client.get/post."""
     now = int(time.time())
     payload = {
         "sub": user_id,
@@ -64,14 +36,6 @@ async def client():
 
 @pytest.fixture(autouse=True)
 def fresh_run_store(monkeypatch):
-    """Every test gets its own RunStore instance. Patched via the
-    get_run_store() GETTER now (routes.py/sse.py/runner.py call
-    `from app.store import get_run_store` and invoke it at call time,
-    not `from app.store import run_store` directly) — same pattern as
-    fresh_quota_store, needed so get_run_store() can transparently
-    return a real Supabase-backed store once app.db's pool is
-    available without every caller needing to know which backend is
-    active."""
     fresh = RunStore()
     monkeypatch.setattr(store_module, "run_store", fresh)
     monkeypatch.setattr(store_module, "get_run_store", lambda: fresh)
@@ -89,8 +53,6 @@ def fresh_run_store(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def fresh_job_store(monkeypatch):
-    """Same isolation guarantee as fresh_run_store, for the
-    ingestion job store — patched via get_job_store() now."""
     fresh = JobStore()
 
     import app.ingest_store as ingest_store_module
@@ -107,12 +69,6 @@ def fresh_job_store(monkeypatch):
 
 @pytest.fixture
 def stub_ingest_source(monkeypatch):
-    """Stubs ingest_source() itself for route-level tests — ingestion
-    logic (chunking, embedding, idempotent IDs, dropped-chunk
-    reporting) is already exhaustively covered in
-    tests/ingestion/test_orchestrator.py; these route tests only need
-    to prove the HTTP layer, background-task wiring, and JobStore
-    integration work correctly."""
     import app.ingestion.runner as ingestion_runner_module
     from app.ingestion.orchestrator import IngestionResult
 

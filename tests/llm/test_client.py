@@ -1,10 +1,3 @@
-"""
-Tests for app.llm.client.call_json — mocks OpenAI's client.chat.
-completions.create directly (not our own wrapper), so these tests
-prove the JSON repair and retry logic work against realistic raw
-API response text, not just against our own assumptions.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -16,9 +9,6 @@ from tests.llm.fakes import fake_completion
 
 
 class FakeCompletions:
-    """Drop-in replacement for client.chat.completions with a
-    scriptable sequence of responses/exceptions per call."""
-
     def __init__(self, responses: list):
         self._responses = list(responses)
         self.call_count = 0
@@ -52,15 +42,10 @@ async def test_call_json_happy_path(monkeypatch):
     result, tokens = await call_json(model="gpt-4o-mini", system_prompt="sys", user_prompt="usr")
 
     assert result == {"topic_identified": True, "score": 0.9}
-    assert tokens == 0  # fake_completion with no usage attached defaults to 0
+    assert tokens == 0
 
 
 async def test_call_json_extracts_real_token_usage(monkeypatch):
-    """Proves the actual token-counting path works — not just that
-    it defaults to 0 when usage is absent. This is what makes the
-    quota system meaningful: without this, quota_store.add_usage()
-    would only ever be called with 0, making the quota check a no-op
-    no matter what the user actually did."""
     fake = FakeClient([fake_completion('{"ok": true}', total_tokens=742)])
     _patch_client(monkeypatch, fake)
 
@@ -70,8 +55,6 @@ async def test_call_json_extracts_real_token_usage(monkeypatch):
 
 
 async def test_call_json_repairs_markdown_fence(monkeypatch):
-    """LLMs told 'JSON only' sometimes still wrap the object in
-    ```json fences — the repair pass must strip these."""
     fake = FakeClient([fake_completion('```json\n{"ok": true}\n```')])
     _patch_client(monkeypatch, fake)
 
@@ -98,8 +81,6 @@ async def test_call_json_raises_llm_call_error_on_unrepairable_json(monkeypatch)
 
 
 async def test_call_json_retries_on_rate_limit_then_succeeds(monkeypatch):
-    """Proves the tenacity retry wrapper actually retries transient
-    errors instead of failing on the first attempt."""
     import httpx
 
     fake_request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
@@ -119,9 +100,6 @@ async def test_call_json_retries_on_rate_limit_then_succeeds(monkeypatch):
 
 
 async def test_call_json_gives_up_after_max_retries(monkeypatch):
-    """3 consecutive timeouts should exhaust tenacity's stop_after_
-    attempt(3) and surface as LLMCallError, not hang or crash the
-    node with an unrelated exception type."""
     import httpx
 
     fake_request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")

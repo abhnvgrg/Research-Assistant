@@ -1,19 +1,3 @@
-"""
-Graph-level tests — these exercise the REAL compiled StateGraph
-(not individual node functions), proving things that can only be
-proven by actually running LangGraph's reducer/superstep machinery:
-
-  - operator.add reducers correctly accumulate 'chunks' and
-    'reflection_history' across multiple reflection cycles
-  - the fan-out at the Router truly runs vector_retriever and
-    web_search in parallel
-  - a topic-less query never reaches retrieval or synthesis nodes
-
-These sit one level above the unit tests in the pyramid — still
-fully mocked (no real OpenAI/Pinecone/Tavily calls), but exercising
-real LangGraph execution semantics instead of isolated functions.
-"""
-
 from __future__ import annotations
 
 import uuid
@@ -39,11 +23,6 @@ def _fresh_state(query: str = "explain attention mechanisms") -> ResearchState:
 
 @pytest.fixture(autouse=True)
 def fast_stubs(monkeypatch):
-    """Speeds up every graph test by stripping the artificial
-    asyncio.sleep() delays baked into the stub functions, and gives
-    deterministic single-pass behavior (reflection always passes)
-    unless a specific test overrides it."""
-
     async def fast_decomposer(query: str) -> tuple[dict, int]:
         return {
             "topic_identified": True,
@@ -91,15 +70,11 @@ async def test_single_pass_run_completes_with_one_cycle():
 
     assert final["cycle_count"] == 1
     assert final["answer"] == "stub answer"
-    # 1 vector chunk + 1 web chunk from the single cycle
     assert len(final["chunks"]) == 2
     assert len(final["reflection_history"]) == 1
 
 
 async def test_chunks_accumulate_via_operator_add_across_cycles(monkeypatch):
-    """The exact bug class we caught live in run_demo.py: chunks
-    must accumulate, not be overwritten, when the Router is
-    re-entered after a failed reflection."""
     call_count = {"n": 0}
 
     async def fail_twice_then_pass(query, sub_qs, answer):
@@ -113,7 +88,6 @@ async def test_chunks_accumulate_via_operator_add_across_cycles(monkeypatch):
     final = await _run_to_completion(_fresh_state())
 
     assert final["cycle_count"] == 3
-    # 2 chunks per cycle (1 vector + 1 web) * 3 cycles = 6
     assert len(final["chunks"]) == 6
     assert len(final["reflection_history"]) == 3
 
@@ -126,11 +100,9 @@ async def test_max_cycles_enforced_even_if_reflection_never_passes(monkeypatch):
 
     final = await _run_to_completion(_fresh_state())
 
-    # Must stop at MAX_CYCLES (3), not loop forever, despite every
-    # single reflection call returning pass_=False.
     assert final["cycle_count"] == 3
     assert len(final["reflection_history"]) == 3
-    assert final.get("answer") is not None  # still produced a final answer
+    assert final.get("answer") is not None
 
 
 async def test_topic_less_query_never_reaches_retrieval(monkeypatch):
@@ -200,11 +172,6 @@ async def test_recency_query_routes_web_only(monkeypatch):
 
 
 async def test_quota_exceeded_user_never_reaches_decomposer(fresh_quota_store):
-    """The real end-to-end proof of the quota fix: a user already
-    over their limit is blocked at quota_check_node, before the
-    decomposer (or anything else that would spend real money) ever
-    runs — verified by node visitation, not just by reading the
-    conditional-edge code."""
     state = _fresh_state()
     await fresh_quota_store.set_limit(state["user_id"], 100)
     await fresh_quota_store.add_usage(state["user_id"], 100)
@@ -219,20 +186,12 @@ async def test_quota_exceeded_user_never_reaches_decomposer(fresh_quota_store):
 
 
 async def test_full_run_accumulates_tokens_and_records_real_usage(fresh_quota_store):
-    """The other half of the quota fix: a full successful run must
-    both (a) correctly SUM tokens_used across every LLM-calling node
-    via the operator.add reducer, and (b) actually record that total
-    against the user's quota by the time the run completes — proving
-    the whole loop (check -> spend -> record) is closed, not just
-    that individual pieces work in isolation."""
     state = _fresh_state()
 
     final_state = {}
     async for snapshot in research_graph.astream(state, stream_mode="values"):
         final_state = snapshot
 
-    # fast_stubs fixture reports: decomposer=50, grader=20/chunk (2
-    # chunks: 1 vector + 1 web = 40), synth=500, reflect=30 → 620 total
     assert final_state["tokens_used"] == 620
     usage = await fresh_quota_store.get_usage(state["user_id"])
     assert usage.tokens_used == 620

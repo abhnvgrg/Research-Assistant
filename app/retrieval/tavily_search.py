@@ -1,14 +1,3 @@
-"""
-Tavily web search client. Kept as a thin wrapper (not behind an ABC
-like VectorStore) because there's only one web search implementation
-in this design — the interface pattern earns its cost when a real
-second implementation exists, not preemptively everywhere.
-
-search_depth='advanced' per our earlier design: Tavily's basic depth
-returns ~200 char snippets; advanced fetches and extracts full
-article text, which the synthesizer needs for real citations.
-"""
-
 from __future__ import annotations
 
 import os
@@ -35,16 +24,13 @@ def get_tavily_client() -> AsyncTavilyClient:
 
 
 async def search_web(query: str, *, max_results: int = 5) -> list[WebResult]:
-    """One Tavily call per sub-question. Returns normalized results —
-    'content' -> text, 'url' -> source — so callers never see
-    Tavily's raw response shape."""
     client = get_tavily_client()
 
     response = await client.search(
         query=query,
         search_depth="advanced",
         max_results=max_results,
-        include_raw_content=False,  # 'content' field is already the extracted text
+        include_raw_content=False,
     )
 
     results: list[WebResult] = []

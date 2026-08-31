@@ -1,13 +1,3 @@
-"""
-Tests that mock ONLY at the OpenAI client boundary (via
-app.llm.client.get_client), letting the real _call_decomposer_llm /
-_call_grader_llm / _call_synthesizer_llm / _call_reflection_llm
-functions in nodes.py run unmodified. This is the layer the earlier
-node-contract tests intentionally skip (they monkeypatch nodes._call_*
-directly) — these tests close that gap by proving the actual prompt
-construction and model selection are correct.
-"""
-
 from __future__ import annotations
 
 import app.graph.nodes as nodes
@@ -27,9 +17,6 @@ from tests.llm.fakes import fake_completion
 
 
 class RecordingCompletions:
-    """Captures every call's kwargs so tests can assert on model
-    name and prompt content, while returning a scripted response."""
-
     def __init__(self, response_content: str, total_tokens: int | None = None):
         self._response_content = response_content
         self._total_tokens = total_tokens
@@ -72,16 +59,10 @@ async def test_grader_llm_truncates_chunk_to_500_chars(monkeypatch):
 
     assert fake.chat.completions.last_kwargs["model"] == MODEL_GRADER
     user_message = fake.chat.completions.last_kwargs["messages"][1]["content"]
-    # 'z' appears nowhere except the (truncated) chunk text itself,
-    # unlike 'x' which also appears in "example.com" — avoids a
-    # false positive from counting characters outside the chunk.
     assert user_message.count("z") == 500
 
 
 async def test_synthesizer_llm_wraps_chunks_in_xml_tags(monkeypatch):
-    """Proves the prompt-injection defense structure is actually
-    present in the constructed prompt, not just described in a
-    docstring."""
     fake = _patch(monkeypatch, "Answer text with [1] citation.", total_tokens=610)
     graded = [
         {**make_chunk("chunk text here", source="https://a.com"), "relevant": True, "grade_score": 0.9, "grade_reason": "ok"}
@@ -97,10 +78,6 @@ async def test_synthesizer_llm_wraps_chunks_in_xml_tags(monkeypatch):
 
 
 async def test_synthesizer_llm_strips_hallucinated_citation_end_to_end(monkeypatch):
-    """The full pipeline: real _call_synthesizer_llm, real citation
-    validator, mocked only at the OpenAI client — proves edge case
-    4.1 is caught even when going through the actual function, not
-    just the validator in isolation."""
     fake = _patch(monkeypatch, "Fact [1] and a fabricated fact [9].")
     graded = [{**make_chunk(source="https://only-source.com"), "relevant": True, "grade_score": 0.9, "grade_reason": "ok"}]
 

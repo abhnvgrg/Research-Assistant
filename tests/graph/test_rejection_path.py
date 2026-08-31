@@ -1,14 +1,3 @@
-"""
-Tests the error_handler branch directly: if check_decomposition would
-return "fail" (e.g. topic_identified=False from edge case 1.1, or
-multi_intent=True from edge case 1.3), the graph must route to
-error_handler and END — never reach retrieval or the synthesizer.
-
-This monkeypatches _call_decomposer_llm for one run to simulate the
-decomposer correctly detecting a topic-less query, then asserts the
-graph never touched vector_retriever/web_search/synthesizer.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -30,7 +19,7 @@ async def fake_empty_topic_decomposer(query: str) -> dict:
 
 
 async def main() -> None:
-    nodes._call_decomposer_llm = fake_empty_topic_decomposer  # monkeypatch
+    nodes._call_decomposer_llm = fake_empty_topic_decomposer
 
     initial_state: ResearchState = {
         "query": "what is the relationship between the thing and the other thing",

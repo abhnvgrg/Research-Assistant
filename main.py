@@ -1,17 +1,3 @@
-"""
-FastAPI application entrypoint.
-
-The startup event fires the Pinecone warmup ping (fix option from
-the tool-scrutiny session — "warmup ping on app start", the
-highest-value/lowest-effort fix against serverless cold start
-latency), and initializes the LangGraph checkpointer so research runs
-become resumable across process restarts. Both are wrapped so a
-failure never crashes app startup — they're optimizations/resilience
-features, not hard dependencies, matching the "never let
-observability/optimization code break the critical path" principle
-applied consistently across the design.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -40,9 +26,9 @@ async def lifespan(app: FastAPI):
         logger.warning("Pinecone warmup failed (non-fatal): %s", e)
 
     await init_checkpointer()
-    await init_pool()  # RunStore/JobStore/QuotaStore fall back to in-memory if this doesn't succeed
+    await init_pool()
 
-    yield  # app runs here
+    yield
 
     await close_checkpointer()
     await close_pool()
@@ -50,10 +36,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Research Assistant API", lifespan=lifespan)
 
-# Permissive for local development — the frontend (single static HTML
-# file, opened via file:// or a local static server) needs to call
-# this API from a different origin. Tighten to your real frontend's
-# origin before deploying anywhere public.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

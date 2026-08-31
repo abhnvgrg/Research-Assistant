@@ -1,11 +1,3 @@
-"""
-Manual smoke test for the research graph — run directly to see the
-full agent loop execute with stubbed external calls, and to print
-every node's state delta as it streams.
-
-Run with:  python -m app.graph.run_demo
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -33,14 +25,6 @@ async def run_query(query: str) -> None:
 
     final_state: dict = {}
 
-    # stream_mode="updates" emits {node_name: state_delta} after each
-    # superstep — this is what powers the real SSE node_start/
-    # node_complete events in the FastAPI integration. We print from
-    # this stream, but we must NOT reconstruct final state by naively
-    # dict.update()-ing deltas — that ignores reducer semantics
-    # (operator.add) and silently under-counts accumulated lists.
-    # Instead we re-run with stream_mode="values" to get the true,
-    # fully-reduced state after the final superstep.
     async for event in research_graph.astream(initial_state, stream_mode="updates"):
         for node_name, delta in event.items():
             printable = {
@@ -50,15 +34,9 @@ async def run_query(query: str) -> None:
             print(f"\n  [{node_name}]")
             print(f"    -> {json.dumps(printable, default=str, indent=6)[1:-1].strip()}")
 
-    # Reset the stub's internal call counter so the second pass
-    # (stream_mode="values") sees the exact same reflection behavior
-    # as the first pass (stream_mode="updates") — otherwise the two
-    # runs would diverge after call 3 since the stub is stateful.
     from app.graph.nodes import _reflection_call_count
     _reflection_call_count["n"] = 0
 
-    # stream_mode="values" yields the full ResearchState after every
-    # superstep — the last one emitted is the true final reduced state.
     async for snapshot in research_graph.astream(initial_state, stream_mode="values"):
         final_state = snapshot
 
